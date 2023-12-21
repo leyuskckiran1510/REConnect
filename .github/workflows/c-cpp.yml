@@ -14,6 +14,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: make
-      run: make
+      run: mkdir -p build/client build/server bin && make
     - name: make clean
       run: make clean
