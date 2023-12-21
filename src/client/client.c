@@ -21,17 +21,6 @@
 #define TIMEOUT_SEC 1
 #define TIMEOUT_MILISEC 0
 
-void error(const char *msg) {
-    perror(msg);
-    exit(EXIT_FAILURE);
-}
-
-typedef struct {
-        int sockfd;
-        struct sockaddr_in server_addr;
-        int *signal;
-} info;
-
 void display_info(info *inf) {
     if (inf != NULL) {
         print("SOCK_DESCRIPTOR [%d],SIGNAL_STATE [%d] ", inf->sockfd,
@@ -39,18 +28,6 @@ void display_info(info *inf) {
     } else {
         print("NULL");
     }
-}
-
-int has_data(int sock) {
-    int retval;
-    fd_set rfds;
-    struct timeval tv;
-    FD_ZERO(&rfds);
-    FD_SET(sock, &rfds);
-    tv.tv_sec = TIMEOUT_SEC;
-    tv.tv_usec = TIMEOUT_MILISEC;
-    retval = select(sock + 1, &rfds, NULL, NULL, &tv);
-    return retval;
 }
 
 void *fn_sender(void *_args) {
@@ -72,8 +49,8 @@ void *fn_sender(void *_args) {
         }
         if (strlen(buffer) > 0) {
             if (sendto(inf->sockfd, buffer, strlen(buffer), 0,
-                       (struct sockaddr *)&inf->server_addr,
-                       sizeof(inf->server_addr)) == -1) {
+                       (struct sockaddr *)&inf->sockaddr,
+                       sizeof(inf->sockaddr)) == -1) {
                 error("Error sending data");
             }
         }
@@ -84,9 +61,9 @@ void *fn_sender(void *_args) {
 void *fn_reciver(void *_args) {
     info *inf = (info *)_args;
     char buffer[MAX_BUFFER_SIZE];
-
+    printf("Signal is [%d]",*inf->signal);
     while (!*inf->signal) {
-        socklen_t serve_add_len = sizeof(inf->server_addr);
+        socklen_t serve_add_len = sizeof(inf->sockaddr);
         if (!has_data(inf->sockfd)) {
             printf("\x1b[9;10000H\r \t\t\t\t[ %s ]\x1b[10000;43H", buffer);
             fflush(stdout);
@@ -95,7 +72,7 @@ void *fn_reciver(void *_args) {
         memset(buffer, 0, MAX_BUFFER_SIZE);
         int recv_len =
             recvfrom(inf->sockfd, buffer, MAX_BUFFER_SIZE, 0,
-                     (struct sockaddr *)&inf->server_addr, &serve_add_len);
+                     (struct sockaddr *)&inf->sockaddr, &serve_add_len);
         if (recv_len == -1) {
             error("Error Receving Response from server");
         }
@@ -109,27 +86,27 @@ void *fn_reciver(void *_args) {
     return (void *)inf;
 }
 
-int send_hello(const info a,const CLIENT c) {
-    MESSAGE m = {.header = {.type = E_CLIENT_HELLO, .sequence = 0},
+int send_hello_(const info a, const CLIENT c) {
+    MESSAGE m = {.header = {.type = E_HELLO, .sequence = 0},
                  .data = {.to = c, .from = c}};
     clock_gettime(0, (struct timespec *)&m.data.timestamp);
-     
-    memcpy(m.data.text, "HELLO FROM CLIENT",17);
+
+    memcpy(m.data.text, "HELLO FROM CLIENT", 17);
     int _s = sendto(a.sockfd, (void *)&m, sizeof(m), 0,
-           (struct sockaddr *)&a.server_addr, sizeof(struct sockaddr_in));
-    if(_s==-1){
+                    (struct sockaddr *)&a.sockaddr, sizeof(struct sockaddr_in));
+    if (_s == -1) {
         error("Error Sending Client Hello");
         return -1;
     }
-    size_t read_length=0;
-    if(!has_data(a.sockfd)){
+    size_t read_length = 0;
+    if (!has_data(a.sockfd)) {
         error("Didnot Recvived The Server Hello");
         return -1;
     }
-    
-    _s = recvfrom(a.sockfd,(void *)&m,sizeof(MESSAGE),0,
-                  (struct sockaddr*)&a.server_addr,(socklen_t*)&read_length);
-    if(_s==-1){
+
+    _s = recvfrom(a.sockfd, (void *)&m, sizeof(MESSAGE), 0,
+                  (struct sockaddr *)&a.sockaddr, (socklen_t *)&read_length);
+    if (_s == -1) {
         error("Couldnot Understand Server Hello");
         return -1;
     }
@@ -139,30 +116,29 @@ int send_hello(const info a,const CLIENT c) {
 int main() {
     thread_obj_setup(2, NULL);
 
-    int signal;
+    int signal=0;
     int sockfd;
-    struct sockaddr_in server_addr;
+    struct sockaddr_in sockaddr;
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
         error("Error creating socket");
     }
 
-    CLIENT c = {.address = {server_addr}, .online = 1};
+    CLIENT c = {.address = {sockaddr}, .online = 1};
     printf("Please Enter Your UserName:- ");
     scanf("%[^\n]+", c.username);
     print_client(c);
 
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
-    server_addr.sin_port = htons(PORT);
+    memset(&sockaddr, 0, sizeof(sockaddr));
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
+    sockaddr.sin_port = htons(PORT);
 
-    info t1 = {.sockfd = sockfd, .server_addr = server_addr, .signal = &signal};
-    
-    if(send_hello(t1,c)==-1){
+    info t1 = {.sockfd = sockfd, .sockaddr = sockaddr, .signal = &signal};
+
+    if (send_hello(t1, c) == -1) {
         error("Error Sending/Receving Hello");
         return 1;
     }
-
 
     int send_index = THREAD_OBJECT.create(fn_sender, (void *)&t1);
     int recive_index = THREAD_OBJECT.create(fn_reciver, (void *)&t1);

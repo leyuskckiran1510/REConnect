@@ -19,12 +19,6 @@
 
 struct sockaddr_in ALL_CLIENTS[100] = {0};
 
-typedef struct {
-        int sockfd;
-        struct sockaddr_in client_addr;
-        int *signal;
-} info;
-
 void display_info(info *inf) {
     if (inf != NULL) {
         print("SOCK_DESCRIPTOR [%d],SIGNAL_STATE [%d] ", inf->sockfd,
@@ -32,11 +26,6 @@ void display_info(info *inf) {
     } else {
         print("NULL");
     }
-}
-
-void error(const char *msg) {
-    perror(msg);
-    exit(EXIT_FAILURE);
 }
 
 // TODO; improve this to reduce hash collision
@@ -78,20 +67,8 @@ void *fn_sender(void *_args) {
     return (void *)inf;
 }
 
-int has_data(int sock) {
-    int retval;
-    fd_set rfds;
-    struct timeval tv;
-    FD_ZERO(&rfds);
-    FD_SET(sock, &rfds);
-    tv.tv_sec = TIMEOUT_SEC;
-    tv.tv_usec = TIMEOUT_MILISEC;
-    retval = select(sock + 1, &rfds, NULL, NULL, &tv);
-    return retval;
-}
-
-int send_hello(const info a, const CLIENT c) {
-    MESSAGE m = {.header = {.type = E_CLIENT_HELLO, .sequence = 0},
+int send_hello_(const info a, const CLIENT c) {
+    MESSAGE m = {.header = {.type = E_HELLO,.sequence = 0},
                  .data = {.to = c, .from = c}};
 
     clock_gettime(0, (struct timespec *)&m.data.timestamp);
@@ -100,7 +77,7 @@ int send_hello(const info a, const CLIENT c) {
     memcpy(m.data.content, "HELLO FROM SERVER", 17);
     int _s =
         sendto(a.sockfd, (void *)&m, sizeof(m), 0,
-               (struct sockaddr *)&a.client_addr, sizeof(struct sockaddr_in));
+               (struct sockaddr *)&a.sockaddr, sizeof(struct sockaddr_in));
     if (_s == -1) {
         error("Error Sending Client Hello");
         return -1;
@@ -117,7 +94,7 @@ void *fn_reciver(void *_args) {
             continue;
         }
         int recv_len = recvfrom(inf->sockfd, buffer, MAX_BUFFER_SIZE, 0,
-                                (struct sockaddr *)&inf->client_addr,
+                                (struct sockaddr *)&inf->sockaddr,
                                 (socklen_t *)&client_len);
 
         if (recv_len == -1) {
@@ -125,7 +102,7 @@ void *fn_reciver(void *_args) {
         }
 
         MESSAGE *m = (MESSAGE *)buffer;
-        int index = generate_index(inf->client_addr);
+        int index = generate_index(inf->sockaddr);
 
         if (not_empty(ALL_CLIENTS[index])) {
             print("Last Port %x ", ALL_CLIENTS[index].sin_port);
@@ -133,10 +110,10 @@ void *fn_reciver(void *_args) {
             print("New Connection Detected: %.*s\n"
                   " Username [%s] \n",
                   recv_len, buffer, m->data.from.username);
-            ALL_CLIENTS[index] = inf->client_addr;
+            ALL_CLIENTS[index] = inf->sockaddr;
         }
 
-        if (m->header.type == E_CLIENT_HELLO) {
+        if (m->header.type == E_HELLO){
             print("CLIETN SAID HELLO TO ME\nRESPONDING BACK");
             CLIENT c;
             send_hello(*(info *)_args, c);
@@ -181,7 +158,7 @@ int main() {
         error("Error binding socket");
     }
 
-    info t1 = {.sockfd = sockfd, .client_addr = server_addr, .signal = &signal};
+    info t1 = {.sockfd = sockfd, .sockaddr = server_addr, .signal = &signal};
     int send_index = THREAD_OBJECT.create(fn_sender, (void *)&t1);
     if (send_index < 0) {
         error("[SERVER] Could Not Initialize Thread fro Sender");
@@ -189,7 +166,7 @@ int main() {
         print("Sucessfully Created Sender");
     }
 
-    info t2 = {.sockfd = sockfd, .client_addr = server_addr, .signal = &signal};
+    info t2 = {.sockfd = sockfd, .sockaddr = server_addr, .signal = &signal};
     int recive_index = THREAD_OBJECT.create(fn_reciver, (void *)&t2);
     if (recive_index < 0) {
         error("[SERVER] Could Not Initialize Thread fro Sender");

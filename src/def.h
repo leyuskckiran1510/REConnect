@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 #include <stdint.h>
 
-#define MAX_USER_NAME 100
+#define MAX_USER_NAME 250 
 
 #define print_client(C)                                                        \
   printf("(Username):-[%s] (Ip):-[%d:%d:%d:%d] (Port):-%u\n", c.username,      \
@@ -39,7 +39,7 @@ typedef union {
 } ADDRESS_IN;
 
 typedef struct {
-    int online;
+    uint32_t online;
     char *last_message;
     ADDRESS_IN address;
     char username[MAX_USER_NAME];

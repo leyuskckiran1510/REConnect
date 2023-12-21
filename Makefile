@@ -47,7 +47,9 @@ run-s:run-server
 run-c:run-client
 	
 clean:
-	rm -f $(BUILDDIR)/client/*.o $(BUILDDIR)/server/*.o $(BINDIR)/*
+	@rm -f $(BINDIR)/* 
+	@rm -f $(BUILDDIR)/*.o
+	@rm -f $(BUILDDIR)/client/*.o $(BUILDDIR)/server/*.o 
 
 
 .PHONY: all clean run-client run-server
