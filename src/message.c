@@ -116,6 +116,44 @@ int recv_heart_beat(const info __has_dot_sockfd, void *buffer) {
     return -1;
 }
 
+
+int recv_text(const info __has_dot_sockfd, void *buffer) {
+    MESSAGE *m = (MESSAGE *)buffer;
+    int _s =
+        recvfrom(__has_dot_sockfd.sockfd, &m, sizeof(MESSAGE), 0, NULL, 0);
+    if (!(_s < 0)) {
+        return E_TEXT_MESSGAE;
+    } else {
+        error("Error Receving HeartBeatResponse");
+    }
+    return -1;
+}
+
+
+
+
+int  send_chunks(const info to, const char *message) {
+    MESSAGE m = {
+        .header.type = E_TEXT_MESSGAE,
+        .header.length = strlen(message)
+    };
+    int length = strlen(message);
+    return 1;
+}
+
+int send_text(const info to, const char *message) {
+    MESSAGE m = {
+        .header.type = E_TEXT_MESSGAE,
+        .header.length = strlen(message)
+    };
+    int length = strlen(message);
+    if(length>MAX_CONTENT_AT_ONCE){
+        return send_chunks( to, message);
+    }
+    memccpy(&m.data,message,length,sizeof(message[0]));
+}
+
+
 MSG_TYPE revive_any(const info from, void *buffer) {
     MSG_HEADER m;
     if (!has_data(from.sockfd)) {
