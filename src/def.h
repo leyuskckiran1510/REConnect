@@ -13,6 +13,8 @@
 
 typedef union {
     /* the total size of this is sizeof(sockaddr_in) */
+    struct sockaddr sockaddr_in;
+    
     struct sockaddr_in sock_addr_in;
     /*
         Spreading sockaddr_in componets for

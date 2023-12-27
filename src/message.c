@@ -7,7 +7,9 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <threads.h>
 #include <time.h>
+#include <unistd.h>
 
 #define TIMEOUT_SEC 5
 #define TIMEOUT_MILISEC 0
@@ -34,9 +36,8 @@ int send_hello(const info to, const CLIENT _client) {
 
     clock_gettime(0, (struct timespec *)&m.data.timestamp);
     sprintf(m.data.text, "HELLO FROM {%s}", _client.username);
-    int _s =
-        sendto(to.sockfd, (void *)&m, sizeof(MESSAGE), 0,
-               (struct sockaddr *)&to.sockaddr, sizeof(struct sockaddr_in));
+    int _s = sendto(to.sockfd, &m, sizeof(MESSAGE), 0, &to._sockaddr,
+                    sizeof(to._sockaddr));
 
     if (_s == -1) {
         error("Error Sending Client Hello");
@@ -63,8 +64,8 @@ int send_ack(const info to, uint32_t ack_value) {
         .header.length = -1,
         .acknowledged = ack_value,
     };
-    int _s = sendto(to.sockfd, (void *)&m, sizeof(M_HELLO_ACK), 0,
-                    (struct sockaddr *)&to.sockaddr, sizeof(to.sockaddr));
+    int _s = sendto(to.sockfd, &m, sizeof(M_HELLO_ACK), 0, &to._sockaddr,
+                    sizeof(to._sockaddr));
     if (_s == -1) {
         error("Error Sending Acknowledgement");
         return -1;
@@ -77,8 +78,7 @@ int recive_ack(const info __has_dot_sockfd, void *buffer) {
     // for later use if needed
     //  struct sockaddr send_from;
     //  socklen_t recived_l;
-    int _s = recvfrom(__has_dot_sockfd.sockfd, (void *)&m, sizeof(MESSAGE), 0,
-                      NULL, 0);
+    int _s = recvfrom(__has_dot_sockfd.sockfd, &m, sizeof(MESSAGE), 0, NULL, 0);
     if (_s == -1) {
         error("Couldnot Understand Server Hello");
         return -1;
@@ -96,8 +96,8 @@ int send_heart_beat(const info to) {
         .header.length = -1,
         .ping = 1,
     };
-    int _s = sendto(to.sockfd, (void *)&m, sizeof(m), 0,
-                    (struct sockaddr *)&to.sockaddr, sizeof(to.sockaddr));
+    int _s = sendto(to.sockfd, &m, sizeof(m), 0, &to._sockaddr,
+                    sizeof(to._sockaddr));
     if (_s == -1) {
         error("Error Sending HeartBeat");
     }
@@ -116,11 +116,9 @@ int recv_heart_beat(const info __has_dot_sockfd, void *buffer) {
     return -1;
 }
 
-
 int recv_text(const info __has_dot_sockfd, void *buffer) {
     MESSAGE *m = (MESSAGE *)buffer;
-    int _s =
-        recvfrom(__has_dot_sockfd.sockfd, &m, sizeof(MESSAGE), 0, NULL, 0);
+    int _s = recvfrom(__has_dot_sockfd.sockfd, &m, sizeof(MESSAGE), 0, NULL, 0);
     if (!(_s < 0)) {
         return E_TEXT_MESSGAE;
     } else {
@@ -129,30 +127,52 @@ int recv_text(const info __has_dot_sockfd, void *buffer) {
     return -1;
 }
 
-
-
-
-int  send_chunks(const info to, const char *message) {
+int send_chunks(const info to, const char *message) {
     MESSAGE m = {
-        .header.type = E_TEXT_MESSGAE,
-        .header.length = strlen(message)
+        .header.type = E_CONTENT_CONTINUE,
     };
     int length = strlen(message);
+    int computed_len = MAX_CONTENT_AT_ONCE;
+    // first send the content as message_text
+    while (message[0] != '\0') {
+        m.header.length = computed_len;
+        memcpy(&m.data, message, computed_len);
+        int _s = sendto(to.sockfd, &m, sizeof(m), 0, &to._sockaddr,
+                        sizeof(to._sockaddr));
+        if (_s >= 0) {
+            length -= computed_len;
+            message += computed_len;
+            computed_len = (length / MAX_CONTENT_AT_ONCE)
+                               ? MAX_CONTENT_AT_ONCE
+                               : length % MAX_CONTENT_AT_ONCE;
+        } else {
+            error("Error While Sending Message Chunk");
+            struct timespec sleep_till = {
+                .tv_sec = 0,
+                .tv_nsec = 5e8,
+            };
+            nanosleep(&sleep_till, NULL);
+        }
+    }
     return 1;
 }
 
 int send_text(const info to, const char *message) {
-    MESSAGE m = {
-        .header.type = E_TEXT_MESSGAE,
-        .header.length = strlen(message)
-    };
+    MESSAGE m = {.header.type = E_TEXT_MESSGAE,
+                 .header.length = strlen(message)};
     int length = strlen(message);
-    if(length>MAX_CONTENT_AT_ONCE){
-        return send_chunks( to, message);
+    if (length > MAX_CONTENT_AT_ONCE) {
+        return send_chunks(to, message);
     }
-    memccpy(&m.data,message,length,sizeof(message[0]));
+    memcpy(&m.data, message, length);
+    int _s = sendto(to.sockfd, &m, sizeof(m), 0, &to._sockaddr,
+                    sizeof(to._sockaddr));
+    if (_s == -1) {
+        error("Error Sending Text Message");
+        return E_ERROR;
+    }
+    return E_TEXT_MESSGAE;
 }
-
 
 MSG_TYPE revive_any(const info from, void *buffer) {
     MSG_HEADER m;
@@ -175,14 +195,14 @@ MSG_TYPE revive_any(const info from, void *buffer) {
         }
         return E_ERROR;
     }
-    case E_HELLO_ACK:{
-        if(recive_ack(from, buffer)>=0){
+    case E_HELLO_ACK: {
+        if (recive_ack(from, buffer) >= 0) {
             return E_HELLO_ACK;
         }
         return E_ERROR;
     }
     case E_HEART_BEAT: {
-        if(recv_heart_beat(from, buffer)>=0){
+        if (recv_heart_beat(from, buffer) >= 0) {
             return E_HEART_BEAT;
         }
         return E_ERROR;
@@ -194,6 +214,10 @@ MSG_TYPE revive_any(const info from, void *buffer) {
     case E_CONTENT_CONTINUE: {
         assert("TODO:// HANDLE case E_CONTENT_CONTINUE:" && 1);
         return E_CONTENT_CONTINUE;
+    }
+    case E_CONTENT_CONT_END: {
+        assert("TODO:// HANDLE case E_CONTENT_CONT_END:" && 1);
+        return E_CONTENT_CONT_END;
     }
     case E_AUDIO_MESSAGE: {
         assert("TODO:// HANDLE case E_AUDIO_MESSAGE:" && 1);

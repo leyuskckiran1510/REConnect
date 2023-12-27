@@ -15,6 +15,7 @@ typedef enum {
     E_HEART_BEAT,
     E_TEXT_MESSGAE,
     E_CONTENT_CONTINUE,
+    E_CONTENT_CONT_END,
     /* Below This are just a dream ;) */
     E_AUDIO_MESSAGE,
     E_VIDEO_MESSGAE,    
@@ -87,7 +88,11 @@ typedef struct {
 
 typedef struct {
         int sockfd;
-        struct sockaddr_in sockaddr;
+        union{
+            struct sockaddr_in sockaddr;
+            struct sockaddr _sockaddr;
+
+        };
         int *signal;
 } info;
 
