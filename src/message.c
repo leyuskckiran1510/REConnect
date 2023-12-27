@@ -127,31 +127,84 @@ int recv_text(const info __has_dot_sockfd, void *buffer) {
     return -1;
 }
 
-int send_chunks(const info to, const char *message) {
+int send_chunks(const info to, const readable *buffer) {
     MESSAGE m = {
         .header.type = E_CONTENT_CONTINUE,
     };
-    int length = strlen(message);
+    if (buffer->type != READABLE) {
+        error("Provided Endpoint is not writeable");
+        return E_ERROR;
+    }
+    void *message = buffer->message;
+    int length = -1;
+    if (buffer->dtype == D_TEXT) {
+        length = strlen(message);
+    }
+
     int computed_len = MAX_CONTENT_AT_ONCE;
+    int _s=0,retry_count=10;
     // first send the content as message_text
-    while (message[0] != '\0') {
-        m.header.length = computed_len;
-        memcpy(&m.data, message, computed_len);
-        int _s = sendto(to.sockfd, &m, sizeof(m), 0, &to._sockaddr,
+    while (1) {
+        m.data.from = to;
+        m.data.to = to;
+        if(buffer->dtype==D_TEXT && _s>=0){
+            m.header.length = computed_len;
+            memcpy(&m.data.text, message, computed_len);
+        }
+        else if(_s>=0){
+            m.header.length = fread(&m.data.content,sizeof(char),MAX_CONTENT_AT_ONCE,buffer->file);
+
+        }
+        _s = sendto(to.sockfd, &m, sizeof(m), 0, &to._sockaddr,
                         sizeof(to._sockaddr));
-        if (_s >= 0) {
+        if (_s >= 0 && buffer->dtype==D_TEXT) {
+            if(length==0){
+                break;
+            }
             length -= computed_len;
             message += computed_len;
             computed_len = (length / MAX_CONTENT_AT_ONCE)
                                ? MAX_CONTENT_AT_ONCE
                                : length % MAX_CONTENT_AT_ONCE;
-        } else {
+        }
+        else if(_s==-1)  {
             error("Error While Sending Message Chunk");
             struct timespec sleep_till = {
                 .tv_sec = 0,
-                .tv_nsec = 5e8,
+                .tv_nsec = 5e8, // 0.5 seconds
             };
+            retry_count--;
+            if(!retry_count){
+                break;
+            }
             nanosleep(&sleep_till, NULL);
+        }else if(feof(buffer->file)){
+            break;
+        }
+    }
+    m.header.type = E_CONTENT_CONT_END;
+    m.header.length=-1;
+    *(m.data.text) = '\0';
+
+    _s  = sendto(to.sockfd,&m,sizeof(m),0,&to._sockaddr,sizeof(to._sockaddr));
+
+
+    return 1;
+}
+
+int recv_chunks(const info __has_dot_sockfd, writeable buffer) {
+    MESSAGE m;
+    while (1) {
+        int _s =
+            recvfrom(__has_dot_sockfd.sockfd, &m, sizeof(m), 0, NULL, NULL);
+        if (_s >= 0) {
+            memcpy(buffer, &m.data, m.header.length);
+            buffer += m.header.length;
+            if (buffer == NULL) {
+                assert("Provided Buffer Is smaller then the receving end" && 1);
+            }
+        } else {
+            error("Error Receving The Chunk");
         }
     }
     return 1;

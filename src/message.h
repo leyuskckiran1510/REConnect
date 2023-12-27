@@ -3,6 +3,7 @@
 
 #include "./def.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <time.h>
 
 #define CHECKSUM_SIZE 100
@@ -100,6 +101,28 @@ typedef union{
     CLIENT client;
     SERVER server;
 }CLIENT_SERVER;
+
+typedef enum{
+    READABLE=0,
+    WRITEABLE,
+    READWRITE,//READABLE|WRITEABLE
+}BUF_TYPE;
+typedef enum{
+    D_TEXT=0,
+    D_FILE,
+    D_LIVE,
+}DATA_TYPE;
+
+
+typedef struct{
+    BUF_TYPE type;
+    DATA_TYPE dtype;
+    union{
+        char * message;
+        FILE * file;
+    };
+}readable,writeable;
+
 
 
 void error(const char *msg) ;
