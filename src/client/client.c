@@ -123,7 +123,8 @@ int main() {
         error("Error creating socket");
     }
 
-    CLIENT c = {.address = {sockaddr}, .online = 1};
+    CLIENT c = {.address = {.sock_addr_in=sockaddr}, .online = 1};
+    
     printf("Please Enter Your UserName:- ");
     scanf("%[^\n]+", c.username);
     print_client(c);
