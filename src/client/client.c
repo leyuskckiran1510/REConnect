@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <time.h>
@@ -15,8 +16,7 @@
 #include "./../threader.h"
 #include <sys/time.h>
 
-#define SERVER_IP "127.0.0.1"
-#define PORT 12345
+
 #define MAX_BUFFER_SIZE 1000024
 #define TIMEOUT_SEC 1
 #define TIMEOUT_MILISEC 0
@@ -124,15 +124,23 @@ int main() {
     }
 
     CLIENT c = {.address = {.sock_addr_in=sockaddr}, .online = 1};
-    
+
     printf("Please Enter Your UserName:- ");
-    scanf("%[^\n]+", c.username);
+    scanf("%[^\n]+\n", c.username);
     print_client(c);
 
     memset(&sockaddr, 0, sizeof(sockaddr));
+    
+    char _server_ip[3*4+4];//255.255.255.255
+    uint _port;
+    printf("Server Address");
+    scanf("\n%[^\n]+\n", _server_ip);
+    printf("Server Port ");
+    scanf("%u",&_port);
+    print("Making Conenction to[%s:%u]",_server_ip,_port);
     sockaddr.sin_family = AF_INET;
-    sockaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
-    sockaddr.sin_port = htons(PORT);
+    sockaddr.sin_addr.s_addr = inet_addr(_server_ip);
+    sockaddr.sin_port = htons(_port);
 
     info t1 = {.sockfd = sockfd, .sockaddr = sockaddr, .signal = &signal};
 

@@ -119,7 +119,7 @@ void *fn_reciver(void *_args) {
             send_hello(*(info *)_args, c);
             continue;
         }
-        if (m->header.type == E_TEXT_MESSGAE) {
+        if (m->header.type == E_TEXT_MESSGAE||1) {
             for (int i = 0; i < 100; i++) {
                 if (!not_empty(ALL_CLIENTS[i]) || index == i) {
                     continue;

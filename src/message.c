@@ -247,6 +247,26 @@ int send_text(const int sockfd, const char *message, CLIENT from, CLIENT to) {
     return E_TEXT_MESSGAE;
 }
 
+int _recv_text(const int sockfd, const char *message, CLIENT from, CLIENT to) {
+    MESSAGE m = {.header.type = E_TEXT_MESSGAE,
+                 .header.length = strlen(message)};
+    int length = strlen(message);
+    if (length > MAX_CONTENT_AT_ONCE) {
+        readable _stream = {
+            .dtype = D_TEXT, .type = READABLE, .message = (char *)message};
+        return send_chunks(sockfd, from, to, &_stream);
+    }
+    memcpy(&m.data, message, length);
+    int _s = sendto(sockfd, &m, sizeof(m), 0, &to.address.sockaddr_in,
+                    sizeof(to.address.sockaddr_in));
+    if (_s == -1) {
+        error("Error Sending Text Message");
+        return E_ERROR;
+    }
+    return E_TEXT_MESSGAE;
+}
+
+
 MSG_TYPE revive_any(const info from, void *buffer) {
     MSG_HEADER m;
     if (!has_data(from.sockfd)) {
@@ -281,8 +301,10 @@ MSG_TYPE revive_any(const info from, void *buffer) {
         return E_ERROR;
     }
     case E_TEXT_MESSGAE: {
-        assert("TODO:// HANDLE case E_TEXT_MESSGAE:" && 1);
-        return E_TEXT_MESSGAE;
+        if(recv_text(from,buffer)>=0){
+            return E_TEXT_MESSGAE;
+        }
+        return E_ERROR;
     }
     case E_CONTENT_CONTINUE: {
         assert("TODO:// HANDLE case E_CONTENT_CONTINUE:" && 1);
