@@ -14,7 +14,7 @@
 #define TIMEOUT_SEC 5
 #define TIMEOUT_MILISEC 0
 
-__THROW void error(const char *msg) {
+void error(const char *msg) {
 #ifdef __DEBUG_MODE__
     perror(msg);
 #else
@@ -121,8 +121,8 @@ int recv_heart_beat(const info __has_dot_sockfd, void *buffer) {
 }
 
 int recv_text(const info __has_dot_sockfd, void *buffer) {
-    MESSAGE *m = (MESSAGE *)buffer;
-    int _s = recv(__has_dot_sockfd.sockfd, &m, sizeof(MESSAGE), 0);
+    // MESSAGE *m = (MESSAGE *)buffer;
+    int _s = recv(__has_dot_sockfd.sockfd, buffer, sizeof(MESSAGE), 0);
     if (!(_s < 0)) {
         return E_TEXT_MESSGAE;
     } else {
@@ -237,7 +237,9 @@ int send_text(const int sockfd, const char *message, CLIENT from, CLIENT to) {
             .dtype = D_TEXT, .type = READABLE, .message = (char *)message};
         return send_chunks(sockfd, from, to, &_stream);
     }
-    memcpy(&m.data, message, length);
+    gettimeofday(&m.data.timestamp,NULL);
+    m.data.from = from;
+    memcpy(&m.data.text, message, length);
     int _s = sendto(sockfd, &m, sizeof(m), 0, &to.address.sockaddr_in,
                     sizeof(to.address.sockaddr_in));
     if (_s == -1) {

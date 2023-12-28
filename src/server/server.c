@@ -47,11 +47,17 @@ void *fn_sender(void *_args) {
     while (!*inf->signal) {
         fgets(buffer, 50, stdin);
         if (strncmp(buffer, "stop", 4) == 0) {
+            MESSAGE m = {
+                .header.type = E_TEXT_MESSGAE,
+                .header.length = 4,
+                .data.text = "stop",
+            };
             for (int i = 0; i < 100; i++) {
                 if (!not_empty(ALL_CLIENTS[i])) {
                     continue;
                 }
-                int send_status = sendto(inf->sockfd, "stop", strlen(buffer), 0,
+
+                int send_status = sendto(inf->sockfd, &m, strlen(buffer), 0,
                                          (struct sockaddr *)&ALL_CLIENTS[i],
                                          sizeof(struct sockaddr));
                 if (send_status == -1) {
@@ -68,16 +74,15 @@ void *fn_sender(void *_args) {
 }
 
 int send_hello_(const info a, const CLIENT c) {
-    MESSAGE m = {.header = {.type = E_HELLO,.sequence = 0},
+    MESSAGE m = {.header = {.type = E_HELLO, .sequence = 0},
                  .data = {.to = c, .from = c}};
 
     clock_gettime(0, (struct timespec *)&m.data.timestamp);
 
     print("Time [%ld]", m.data.timestamp.tv_sec);
     memcpy(m.data.content, "HELLO FROM SERVER", 17);
-    int _s =
-        sendto(a.sockfd, (void *)&m, sizeof(m), 0,
-               (struct sockaddr *)&a.sockaddr, sizeof(struct sockaddr_in));
+    int _s = sendto(a.sockfd, (void *)&m, sizeof(m), 0,
+                    (struct sockaddr *)&a.sockaddr, sizeof(struct sockaddr_in));
     if (_s == -1) {
         error("Error Sending Client Hello");
         return -1;
@@ -113,19 +118,20 @@ void *fn_reciver(void *_args) {
             ALL_CLIENTS[index] = inf->sockaddr;
         }
 
-        if (m->header.type == E_HELLO){
+        if (m->header.type == E_HELLO) {
             print("CLIETN SAID HELLO TO ME\nRESPONDING BACK");
             CLIENT c;
             send_hello(*(info *)_args, c);
             continue;
         }
-        if (m->header.type == E_TEXT_MESSGAE||1) {
+        if (m->header.type == E_TEXT_MESSGAE) {
             for (int i = 0; i < 100; i++) {
                 if (!not_empty(ALL_CLIENTS[i]) || index == i) {
                     continue;
                 }
                 int send_status =
-                    sendto(inf->sockfd, buffer, recv_len, 0,(struct sockaddr *)&ALL_CLIENTS[i], client_len);
+                    sendto(inf->sockfd, buffer, recv_len, 0,
+                           (struct sockaddr *)&ALL_CLIENTS[i], client_len);
                 if (send_status == -1) {
                     error(strerror(errno));
                 }
