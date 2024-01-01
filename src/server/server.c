@@ -35,8 +35,9 @@ int generate_index(const struct sockaddr_in a) {
     return (ip ^ port) % 100;
 }
 
-int not_empty(const struct sockaddr_in a) {
-    return a.sin_port & a.sin_addr.s_addr;
+int is_empty(const struct sockaddr_in a) {
+    //at least one bit will match if their are any data
+    return !(a.sin_port & a.sin_addr.s_addr);
 }
 
 void *fn_sender(void *_args) {
@@ -53,7 +54,7 @@ void *fn_sender(void *_args) {
                 .data.text = "stop",
             };
             for (int i = 0; i < 100; i++) {
-                if (!not_empty(ALL_CLIENTS[i])) {
+                if (is_empty(ALL_CLIENTS[i])) {
                     continue;
                 }
 
@@ -109,7 +110,7 @@ void *fn_reciver(void *_args) {
         MESSAGE *m = (MESSAGE *)buffer;
         int index = generate_index(inf->sockaddr);
 
-        if (not_empty(ALL_CLIENTS[index])) {
+        if (is_empty(ALL_CLIENTS[index])) {
             print("Last Port %x ", ALL_CLIENTS[index].sin_port);
         } else {
             print("New Connection Detected: %.*s\n"
@@ -126,7 +127,7 @@ void *fn_reciver(void *_args) {
         }
         if (m->header.type == E_TEXT_MESSGAE) {
             for (int i = 0; i < 100; i++) {
-                if (!not_empty(ALL_CLIENTS[i]) || index == i) {
+                if (!is_empty(ALL_CLIENTS[i]) || index == i) {
                     continue;
                 }
                 int send_status =

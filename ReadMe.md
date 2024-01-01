@@ -1,6 +1,6 @@
 # ReConnect
-    A comunication software that aims for faster and low 
-     lowlatency communication and realtime interaction
+    A communication software that aims for faster and low 
+     low-latency communication and real-time interaction
         world-wide with out any interruption.
 
         
