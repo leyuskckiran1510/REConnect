@@ -1,4 +1,4 @@
-CC = clang
+CC = gcc
 CFLAGS = -ggdb3 -Wall -Wextra -pedantic -I./include  -lpthread -fsanitize=address
 
 SRCDIR = src

@@ -81,6 +81,7 @@ void *fn_reciver(void *_args) {
         if (recv_len == E_ERROR) {
             error("Error Receving Response from server");
         }
+        printf("[Buffer] %s\n",_buffer);
         if (strncmp(buffer.data.text, "stop", 4) == 0) {
             fprintf(stderr, "Server Stopped THe Connection");
             *inf->signal = 1;

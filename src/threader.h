@@ -6,7 +6,7 @@
 #include <pthread.h>
 #include <stdint.h>
 
-#define log(fd,x,...) fprintf(fd,x,##__VA_ARGS__ ); 
+#define log(fd, x, ...) fprintf(fd, x, ##__VA_ARGS__);
 
 typedef struct {
         uint8_t max;
@@ -23,7 +23,7 @@ typedef struct {
         void (*clean)();
 } thread_obj;
 
-void thread_obj_setup(uint8_t max,pthread_attr_t *attrs);
+void thread_obj_setup(uint8_t max, pthread_attr_t *attrs);
 int create(void *(*callback)(void *), void *args);
 void *join(int index);
 int cancle(int index);
@@ -31,12 +31,12 @@ int stop(int index);
 
 static thread_obj THREAD_OBJECT = {
     .max = 0xff,
-    .count=0,
+    .count = 0,
     .threads = NULL,
     .create = &create,
-    .join=&join,
-    .cancle=&cancle,
-    .stop=&stop,
+    .join = &join,
+    .cancle = &cancle,
+    .stop = &stop,
 };
 
 #endif
